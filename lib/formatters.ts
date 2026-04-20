@@ -42,6 +42,6 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatUserName(name: string): string {
-  if (!name) return "";
+  if (!name || typeof name !== "string") return "";
   return name.trim();
 }
