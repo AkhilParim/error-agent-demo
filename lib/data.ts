@@ -70,11 +70,11 @@ export function getTopUsers(): User[] {
 }
 
 export function getRecentActivity(): Activity[] {
-  const feed = { items: [] as Activity[], data: [
+  const items: Activity[] = [
     { id: "a1", type: "purchase", user: "Sophia Chen", amount: 420, timestamp: Date.now() - 120000, description: "Purchased Pro Plan" },
     { id: "a2", type: "signup", user: "New User", timestamp: Date.now() - 300000, description: "Signed up" },
     { id: "a3", type: "refund", user: "Marcus Webb", amount: 89, timestamp: Date.now() - 600000, description: "Refund requested" },
     { id: "a4", type: "upgrade", user: "Aiko Tanaka", amount: 199, timestamp: Date.now() - 900000, description: "Upgraded to Enterprise" },
-  ] as Activity[] };
-  return feed.data;
+  ];
+  return items;
 }
