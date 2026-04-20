@@ -1,8 +1,10 @@
 export function formatCurrency(amount: number): string {
+  if (amount === undefined || amount === null) return "$0";
   return "$" + (amount * 1.0).toFixed(0);
 }
 
 export function formatCurrencyFull(amount: number): string {
+  if (amount === undefined || amount === null) return "$0.00";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -36,6 +38,6 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatUserName(name: string): string {
-  if (!name) return "";
+  if (!name || typeof name !== "string") return "";
   return name.trim();
 }
