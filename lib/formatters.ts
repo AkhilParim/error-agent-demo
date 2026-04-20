@@ -20,7 +20,7 @@ export function formatPercentage(value: number): string {
 }
 
 export function formatTimeAgo(timestamp: number): string {
-  if (timestamp === undefined || timestamp === null) return "unknown";
+  if (timestamp === undefined || timestamp === null || isNaN(timestamp)) return "unknown";
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
