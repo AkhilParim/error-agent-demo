@@ -15,6 +15,7 @@ type Intent = "inject" | "fix";
 type DeployPhase =
   | null
   | { kind: "committing"; intent: Intent }
+  | { kind: "analyzing" }                              // Claude is analyzing errors
   | { kind: "deploying"; intent: Intent; elapsed: number }
   | { kind: "reloading"; intent: Intent };
 
@@ -115,19 +116,21 @@ export default function ChaosControl() {
   }
 
   async function triggerFix() {
-    setPhase({ kind: "committing", intent: "fix" });
+    // Step 1: snapshot what's currently deployed
+    const priorRes = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
+    const prior: ChaosState = await priorRes.json().catch(() => ({ timestamp: null }));
+
+    // Step 2: show "Claude analyzing" while the API calls Claude + commits
+    setPhase({ kind: "analyzing" });
 
     try {
-      // Snapshot current deployed timestamp before committing the fix
-      const priorRes = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
-      const prior: ChaosState = await priorRes.json().catch(() => ({ timestamp: null }));
-
       const res = await fetch("/api/fix", { method: "POST" });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error ?? "Fix failed");
       }
 
+      // Step 3: Claude committed the fix — now wait for Vercel to redeploy
       startPollingForDeploy("fix", prior.timestamp ?? null);
     } catch (e) {
       console.error("Fix failed:", e);
@@ -143,32 +146,32 @@ export default function ChaosControl() {
   function statusLine() {
     if (!phase) return "";
     if (phase.kind === "reloading") return "Deploy live — reloading page…";
-    if (phase.kind === "committing") {
-      return phase.intent === "fix"
-        ? "Committing clean files to GitHub…"
-        : "Committing error files to GitHub…";
-    }
+    if (phase.kind === "analyzing") return "Claude is reading the broken files and generating a fix…";
+    if (phase.kind === "committing") return "Committing error files to GitHub…";
     if (phase.kind === "deploying") {
-      const action = phase.intent === "fix" ? "Fix committed" : "Errors injected in the code";
+      const action = phase.intent === "fix" ? "Fix committed by Claude" : "Errors injected in the code";
       return `${action} · Waiting for Vercel Deployment (${elapsed}s)…`;
     }
     return "";
   }
 
+  const isFixing = phase?.kind === "analyzing" || (phase?.kind !== "committing" && phase?.kind !== null && (phase as {intent?: Intent}).intent === "fix");
+  const isInjecting = !isFixing && isDeploying;
+
   const borderColor =
-    phase?.intent === "fix" ? "border-emerald-500/30 bg-emerald-500/5" :
-    phase?.intent === "inject" ? "border-indigo-500/30 bg-indigo-500/5" :
+    isFixing ? "border-emerald-500/30 bg-emerald-500/5" :
+    isInjecting ? "border-indigo-500/30 bg-indigo-500/5" :
     state.active ? "border-red-500/30 bg-red-500/5" :
     "border-zinc-800 bg-zinc-900/50";
 
   const iconColor =
-    phase?.intent === "fix" ? "text-emerald-400" :
-    phase?.intent === "inject" ? "text-indigo-400" :
+    isFixing ? "text-emerald-400" :
+    isInjecting ? "text-indigo-400" :
     state.active ? "text-red-400" : "text-zinc-500";
 
   const iconBg =
-    phase?.intent === "fix" ? "bg-emerald-500/15" :
-    phase?.intent === "inject" ? "bg-indigo-500/15" :
+    isFixing ? "bg-emerald-500/15" :
+    isInjecting ? "bg-indigo-500/15" :
     state.active ? "bg-red-500/10" : "bg-zinc-800";
 
   return (
@@ -219,7 +222,7 @@ export default function ChaosControl() {
           {isDeploying ? (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 text-zinc-400 cursor-not-allowed select-none">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {intent === "fix" ? "Deploying fix…" : "Deploying errors…"}
+              {isFixing ? "Deploying Claude's fix…" : "Deploying errors…"}
             </div>
           ) : state.active ? (
             <button
@@ -236,7 +239,7 @@ export default function ChaosControl() {
               className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-              {loading ? "Injecting…" : "Inject Next Errors"}
+              {loading ? "Injecting…" : "Inject Errors"}
             </button>
           )}
         </div>

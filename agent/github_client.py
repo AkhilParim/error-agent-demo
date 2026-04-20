@@ -80,7 +80,7 @@ def commit_fixes(fixes: list[dict[str, str]], scene: int = 0) -> None:
             timeout=20,
         )
 
-        if not resp.ok:
+        if not resp.is_success:
             raise RuntimeError(f"GitHub API error for {path}: {resp.status_code} {resp.text}")
 
         print(f"[github_client] Committed fix: {path}")
