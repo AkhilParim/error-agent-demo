@@ -1,4 +1,4 @@
-// BUG SCENE 2 — injected by chaos system
+// BUG SCENE 3 — injected by chaos system
 
 export interface Metric {
   label: string;
@@ -34,17 +34,15 @@ export interface Activity {
   description: string;
 }
 
-// BUG 4: totalVisitors hardcoded to 0 → division by zero → "Infinity%" displayed
-// Also triggers: TypeError when downstream code calls .toFixed() on Infinity
+// BUG 9: Accessing .summary.revenue on an object that has no .summary key
+// TypeError: Cannot read properties of undefined (reading 'revenue')
 export function getMetricsSummary(): Metric[] {
-  const signups = 124;
-  const totalVisitors = 0;
-  const conversionRate = (signups / totalVisitors) * 100;
+  const store = { data: { total: 124580 } } as unknown as { data: { summary: { revenue: number } } };
   return [
-    { label: "Total Revenue", value: "$124,580", change: 12.4, changeLabel: "vs last month", prefix: "$" },
+    { label: "Total Revenue", value: `$${store.data.summary.revenue}`, change: 12.4, changeLabel: "vs last month" },
     { label: "Active Users", value: "3,842", change: 8.1, changeLabel: "vs last month" },
-    { label: "Conversion Rate", value: `${conversionRate}%`, change: -0.3, changeLabel: "vs last month", suffix: "%" },
-    { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month", prefix: "$" },
+    { label: "Conversion Rate", value: "3.24%", change: -0.3, changeLabel: "vs last month" },
+    { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month" },
   ];
 }
 
@@ -59,7 +57,6 @@ export function getRevenueTimeline(): RevenuePoint[] {
   ];
 }
 
-// BUG 5: Typo 'reveneu' → sort comparator uses undefined → NaN → random order
 export function getTopUsers(): User[] {
   const users: User[] = [
     { id: "u1", name: "Sophia Chen", email: "s.chen@acme.com", revenue: 18420, orders: 47, status: "active", joinedAt: "2023-03-12" },
@@ -71,12 +68,11 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
-  type UserWithTypo = User & { reveneu?: number };
-  return (users as UserWithTypo[]).sort((a, b) => (b.reveneu as number) - (a.reveneu as number));
+  return users.sort((a, b) => b.revenue - a.revenue);
 }
 
-// BUG 6: Returns undefined by missing the data — downstream .map() throws
+// BUG 10: null.map() → TypeError: Cannot read properties of null (reading 'map')
 export function getRecentActivity(): Activity[] {
-  const feed = { items: [] as Activity[] };
-  return (feed as unknown as { data: Activity[] }).data;
+  const cached = null as unknown as Activity[];
+  return cached.map((a) => a);
 }

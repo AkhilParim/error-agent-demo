@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Zap, AlertTriangle, CheckCircle, Loader2, ChevronRight } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Zap, AlertTriangle, CheckCircle2, Loader2, Wrench } from "lucide-react";
 
 interface ChaosState {
   active: boolean;
@@ -10,17 +10,19 @@ interface ChaosState {
   injectedFiles: string[];
 }
 
-const SCENE_DESCRIPTIONS = [
-  null,
-  "Null reference errors in data layer + currency formatter crash",
-  "Division-by-zero in metrics + broken activity timestamps",
-  "ReferenceError in growth calculator + invalid date formatting + table crash",
-];
+const SCENE_DESCRIPTIONS: Record<number, string> = {
+  1: "Null refs in data layer + currency formatter crash",
+  2: "Division-by-zero in metrics + NaN dates + broken activity feed",
+  3: "Undefined property access + null map() + NaN time display",
+};
 
 export default function ChaosControl() {
   const [state, setState] = useState<ChaosState>({ active: false, scene: 0, timestamp: null, injectedFiles: [] });
   const [loading, setLoading] = useState(false);
-  const [hasToken, setHasToken] = useState(true);
+  const [fixing, setFixing] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     fetch("/api/chaos")
@@ -29,9 +31,45 @@ export default function ChaosControl() {
       .catch(() => {});
   }, []);
 
-  const nextScene = (state.scene % 3) + 1;
+  function startPollingForFix() {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/chaos");
+        const data: ChaosState = await res.json();
+        if (!data.active) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setFixing(false);
+          setState(data);
+          startReloadCountdown();
+        }
+      } catch {
+        // ignore
+      }
+    }, 4000);
+  }
 
-  async function triggerChaos() {
+  function startReloadCountdown() {
+    setCountdown(5);
+    let n = 5;
+    countdownRef.current = setInterval(() => {
+      n -= 1;
+      setCountdown(n);
+      if (n <= 0) {
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        window.location.reload();
+      }
+    }, 1000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  async function injectErrors() {
     setLoading(true);
     try {
       const res = await fetch("/api/chaos", {
@@ -39,16 +77,8 @@ export default function ChaosControl() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "inject" }),
       });
-
-      if (res.status === 500) {
-        const err = await res.json();
-        if (err.message?.includes("GITHUB_TOKEN")) {
-          setHasToken(false);
-        }
-        throw new Error(err.message);
-      }
-
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Injection failed");
       setState((prev) => ({
         ...prev,
         active: true,
@@ -57,20 +87,47 @@ export default function ChaosControl() {
         injectedFiles: data.files,
       }));
     } catch (e) {
-      console.error("Chaos trigger failed:", e);
+      console.error("Inject failed:", e);
     } finally {
       setLoading(false);
     }
   }
 
+  async function triggerFix() {
+    setFixing(true);
+    try {
+      const res = await fetch("/api/fix", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error ?? "Fix failed");
+      }
+      startPollingForFix();
+    } catch (e) {
+      console.error("Fix failed:", e);
+      setFixing(false);
+    }
+  }
+
+  const nextScene = (state.scene % 3) + 1;
+
+  if (countdown !== null) {
+    return (
+      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 backdrop-blur-sm p-5 flex items-center justify-center min-h-[160px]">
+        <div className="text-center">
+          <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-zinc-100">Fix deployed</p>
+          <p className="text-xs text-zinc-500 mt-1">Reloading in <span className="text-emerald-400 font-mono">{countdown}s</span>...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`rounded-xl border p-5 transition-all duration-300 ${
-      state.active
-        ? "border-red-500/30 bg-red-500/5"
-        : "border-zinc-800 bg-zinc-900/50"
-    } backdrop-blur-sm`}>
+    <div className={`rounded-xl border p-5 transition-all duration-300 backdrop-blur-sm ${
+      state.active ? "border-red-500/30 bg-red-500/5" : "border-zinc-800 bg-zinc-900/50"
+    }`}>
       <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Zap className={`h-4 w-4 ${state.active ? "text-red-400" : "text-zinc-500"}`} />
             <h3 className="text-sm font-semibold text-zinc-100">Chaos Control</h3>
@@ -82,21 +139,14 @@ export default function ChaosControl() {
             )}
           </div>
           <p className="text-xs text-zinc-500 mb-3">
-            Injects real bugs into source code. Claude agent detects via PostHog and auto-fixes.
+            {state.active
+              ? "Live bugs injected into source. Claude agent will auto-fix."
+              : "Inject real bugs into source code. Claude detects via PostHog and fixes automatically."}
           </p>
-
-          {!hasToken && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 mb-3">
-              <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-yellow-300">
-                <strong>GITHUB_TOKEN</strong> not configured. Add it to Vercel environment variables to enable cloud chaos injection.
-              </p>
-            </div>
-          )}
 
           {state.active && state.injectedFiles.length > 0 && (
             <div className="mb-3">
-              <p className="text-xs text-zinc-500 mb-1.5">Injected into:</p>
+              <p className="text-xs text-zinc-500 mb-1.5">Affected files:</p>
               <div className="flex flex-wrap gap-1.5">
                 {state.injectedFiles.map((f) => (
                   <span key={f} className="text-[10px] font-mono bg-red-500/10 text-red-300 border border-red-500/15 px-2 py-0.5 rounded">
@@ -110,38 +160,51 @@ export default function ChaosControl() {
             </div>
           )}
 
-          {state.active && (
-            <div className="flex items-center gap-2 text-xs text-zinc-500">
-              <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-              Errors published to PostHog · Agent monitoring for fix
+          {fixing && (
+            <div className="flex items-center gap-2 text-xs text-indigo-400">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Agent is pushing fix to GitHub · Vercel redeploying…
             </div>
           )}
         </div>
 
-        <button
-          onClick={triggerChaos}
-          disabled={loading}
-          className={`flex items-center gap-2 shrink-0 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-            state.active
-              ? "bg-red-500 hover:bg-red-600 text-white animate-pulse-ring"
-              : "bg-indigo-600 hover:bg-indigo-500 text-white"
-          }`}
-        >
-          {loading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+        <div className="shrink-0">
+          {state.active ? (
+            <button
+              onClick={triggerFix}
+              disabled={fixing}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {fixing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wrench className="h-4 w-4" />
+              )}
+              {fixing ? "Fixing…" : "Fix Errors"}
+            </button>
           ) : (
-            <Zap className="h-4 w-4" />
+            <button
+              onClick={injectErrors}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
+              {loading ? "Injecting…" : "Inject Next Errors"}
+            </button>
           )}
-          {loading ? "Injecting..." : state.active ? `Next Scene` : "Trigger Chaos"}
-          {!loading && <ChevronRight className="h-3.5 w-3.5 opacity-60" />}
-        </button>
+        </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-zinc-800/50 flex items-center gap-6 text-xs text-zinc-600">
-        <span>Scene {nextScene} next</span>
-        <span>·</span>
-        <span>{SCENE_DESCRIPTIONS[nextScene]}</span>
-      </div>
+      {!state.active && (
+        <div className="mt-4 pt-4 border-t border-zinc-800/50 flex items-center gap-2 text-xs text-zinc-600">
+          <AlertTriangle className="h-3 w-3" />
+          <span>Next: Scene {nextScene} — {SCENE_DESCRIPTIONS[nextScene]}</span>
+        </div>
+      )}
     </div>
   );
 }

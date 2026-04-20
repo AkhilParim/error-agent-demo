@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Zap, Settings, Bell, User } from "lucide-react";
+import dynamic from "next/dynamic";
 import ChaosControl from "./ChaosControl";
 import AgentMonitor from "./AgentMonitor";
-import ComponentHealth from "./ComponentHealth";
+
+// ssr: false prevents broken probe code from executing at build time
+const ComponentHealth = dynamic(() => import("./ComponentHealth"), { ssr: false });
 
 interface ChaosState {
   active: boolean;

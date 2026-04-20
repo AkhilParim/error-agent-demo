@@ -24,11 +24,11 @@ const SCENE_FILES = {
   ],
   2: [
     { src: "error-sets/scene-2/lib/data.ts", dest: "lib/data.ts" },
-    { src: "error-sets/scene-2/components/ActivityFeed.tsx", dest: "components/ActivityFeed.tsx" },
+    { src: "error-sets/scene-2/lib/formatters.ts", dest: "lib/formatters.ts" },
   ],
   3: [
+    { src: "error-sets/scene-3/lib/data.ts", dest: "lib/data.ts" },
     { src: "error-sets/scene-3/lib/formatters.ts", dest: "lib/formatters.ts" },
-    { src: "error-sets/scene-3/components/UserTable.tsx", dest: "components/UserTable.tsx" },
   ],
 };
 

@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingIncludes: {
     "/api/chaos": ["error-sets/**"],
+    "/api/fix": ["error-sets/clean/**"],
   },
 };
 
