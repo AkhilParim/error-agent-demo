@@ -15,10 +15,6 @@ def _client() -> anthropic.Anthropic:
 FIXABLE_FILES = [
     "lib/data.ts",
     "lib/formatters.ts",
-    "components/ActivityFeed.tsx",
-    "components/UserTable.tsx",
-    "components/RevenueChart.tsx",
-    "components/MetricsGrid.tsx",
 ]
 
 
@@ -51,18 +47,10 @@ def _infer_affected_files(exceptions: list[dict[str, Any]]) -> list[str]:
             if filename in stack.lower() or filename in component.lower():
                 implicated.add(path)
 
-        # Fallback: if MetricsGrid or RevenueChart crashed, data.ts is likely culprit
-        if "metricsGrid" in component or "MetricsGrid" in component:
+        # All probe components call lib/data.ts and lib/formatters.ts
+        if component in ("Data Layer", "Formatters", "Activity Feed", "User Table"):
             implicated.add("lib/data.ts")
             implicated.add("lib/formatters.ts")
-        if "ActivityFeed" in component:
-            implicated.add("components/ActivityFeed.tsx")
-            implicated.add("lib/data.ts")
-        if "UserTable" in component:
-            implicated.add("components/UserTable.tsx")
-            implicated.add("lib/formatters.ts")
-        if "RevenueChart" in component:
-            implicated.add("lib/data.ts")
 
     return list(implicated) if implicated else ["lib/data.ts", "lib/formatters.ts"]
 
@@ -81,8 +69,11 @@ def fix_errors_with_claude(exceptions: list[dict[str, Any]]) -> list[dict[str, s
             file_contents[path] = content
         except Exception as e:
             print(f"[fixer] Could not fetch {path}: {e}")
+            if "401" in str(e) or "Unauthorized" in str(e):
+                print("[fixer] *** GITHUB_TOKEN is invalid or expired — update it in Railway env vars ***")
 
     if not file_contents:
+        print("[fixer] No source files fetched — cannot generate fix. Check GITHUB_TOKEN.")
         return []
 
     error_summary = _build_error_summary(exceptions)
