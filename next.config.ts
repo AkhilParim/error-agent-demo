@@ -2,7 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
-    "*": ["agent/**", "error-sets/**", "scripts/**"],
+    "*": ["agent/**", "scripts/**"],
+  },
+  outputFileTracingIncludes: {
+    "/api/chaos": ["error-sets/**"],
   },
 };
 
