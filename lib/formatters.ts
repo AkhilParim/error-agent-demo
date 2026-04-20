@@ -20,6 +20,7 @@ export function formatPercentage(value: number): string {
 }
 
 export function formatTimeAgo(timestamp: number): string {
+  if (timestamp === undefined || timestamp === null) return "unknown";
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -28,6 +29,7 @@ export function formatTimeAgo(timestamp: number): string {
 }
 
 export function formatDate(isoString: string): string {
+  if (!isoString) return "";
   return new Date(isoString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
