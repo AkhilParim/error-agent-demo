@@ -1,6 +1,3 @@
-// BUG SCENE 2 — injected by chaos system
-
-// FIX 7: factor changed from string "1.0" to number 1.0 to avoid NaN
 export function formatCurrency(amount: number): string {
   const factor = 1.0;
   return "$" + (amount * factor).toFixed(0);
@@ -31,7 +28,6 @@ export function formatTimeAgo(timestamp: number): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-// FIX 8: Pass isoString to new Date() instead of undefined
 export function formatDate(isoString: string): string {
   return new Date(isoString).toLocaleDateString("en-US", {
     month: "short",
