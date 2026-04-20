@@ -1,3 +1,3 @@
 [deploy]
-startCommand = "python agent/main.py"
+startCommand = "python3 agent/main.py"
 restartPolicyType = "always"

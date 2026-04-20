@@ -4,4 +4,4 @@ providers = ["python"]
 cmds = ["pip install -r agent/requirements.txt"]
 
 [start]
-cmd = "python agent/main.py"
+cmd = "python3 agent/main.py"
