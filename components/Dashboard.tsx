@@ -95,14 +95,14 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Chaos + Agent side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChaosControl />
+        {/* Chaos Control — full width */}
+        <ChaosControl />
+
+        {/* Component Health (left) + Agent Monitor (right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <ComponentHealth scene={chaos.scene} />
           <AgentMonitor />
         </div>
-
-        {/* Component health probes */}
-        <ComponentHealth scene={chaos.scene} />
       </main>
     </div>
   );

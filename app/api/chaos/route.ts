@@ -27,11 +27,20 @@ const SCENE_FILES: Record<number, SceneFile[]> = {
 };
 
 export async function GET() {
-  const statePath = path.join(ROOT, "chaos-state.json");
-  const state = existsSync(statePath)
-    ? JSON.parse(readFileSync(statePath, "utf-8"))
-    : { active: false, scene: 0 };
-  return NextResponse.json(state);
+  try {
+    // Read from GitHub so we always get the latest committed state,
+    // regardless of which Vercel deployment is currently serving.
+    const { getFileContent } = await import("@/lib/github");
+    const raw = await getFileContent("chaos-state.json");
+    return NextResponse.json(JSON.parse(raw));
+  } catch {
+    // Fallback to local filesystem (e.g. during local dev or if GitHub token missing)
+    const statePath = path.join(ROOT, "chaos-state.json");
+    const state = existsSync(statePath)
+      ? JSON.parse(readFileSync(statePath, "utf-8"))
+      : { active: false, scene: 0 };
+    return NextResponse.json(state);
+  }
 }
 
 export async function POST(req: NextRequest) {

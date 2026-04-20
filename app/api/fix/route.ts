@@ -17,10 +17,6 @@ export async function POST() {
       ? JSON.parse(readFileSync(statePath, "utf-8"))
       : { active: false, scene: 0 };
 
-    if (!currentState.active) {
-      return NextResponse.json({ success: true, message: "Already clean" });
-    }
-
     const updates = CLEAN_FILES.map((f) => ({
       path: f.dest,
       content: readFileSync(path.join(ROOT, f.src), "utf-8"),

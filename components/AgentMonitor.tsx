@@ -34,7 +34,12 @@ export default function AgentMonitor() {
     try {
       const res = await fetch("/api/agent-status", { cache: "no-store" });
       const data = await res.json();
-      setEvents(data.events ?? []);
+      // Deduplicate consecutive identical messages and cap at 8
+      const raw: AgentEvent[] = data.events ?? [];
+      const deduped = raw.filter((e, i) =>
+        i === 0 || e.message !== raw[i - 1].message || e.status !== raw[i - 1].status
+      ).slice(0, 8);
+      setEvents(deduped);
       setIsAgentActive((data.events ?? []).some(
         (e: AgentEvent) => Date.now() - new Date(e.timestamp).getTime() < 120000
       ));
