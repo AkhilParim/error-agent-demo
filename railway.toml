@@ -1,8 +1,3 @@
-[build]
-builder = "nixpacks"
-buildCommand = "pip install -r agent/requirements.txt"
-
 [deploy]
-startCommand = "cd agent && python main.py"
+startCommand = "python agent/main.py"
 restartPolicyType = "always"
-healthcheckPath = ""
