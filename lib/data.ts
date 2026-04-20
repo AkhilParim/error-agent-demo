@@ -76,7 +76,7 @@ export function getRevenueTimeline(): RevenuePoint[] {
 }
 
 export function getTopUsers(): User[] {
-  const users: User[] = [
+  const users: (User | null)[] = [
     { id: "u1", name: "Sophia Chen", email: "s.chen@acme.com", revenue: 18420, orders: 47, status: "active", joinedAt: "2023-03-12" },
     { id: "u2", name: "Marcus Webb", email: "m.webb@globex.io", revenue: 15830, orders: 39, status: "active", joinedAt: "2023-05-08" },
     { id: "u3", name: "Aiko Tanaka", email: "a.tanaka@nexus.co", revenue: 14290, orders: 33, status: "active", joinedAt: "2023-01-22" },
@@ -87,7 +87,7 @@ export function getTopUsers(): User[] {
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
 
-  return users.filter((u) => u != null).sort((a, b) => (b?.revenue ?? 0) - (a?.revenue ?? 0));
+  return users.filter((u): u is User => u != null).sort((a, b) => (b?.revenue ?? 0) - (a?.revenue ?? 0));
 }
 
 export function getRecentActivity(): Activity[] {
