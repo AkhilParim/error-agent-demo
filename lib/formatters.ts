@@ -1,8 +1,5 @@
-// BUG SCENE 2 — injected by chaos system
-
-// BUG 7: Multiplies amount (number) by the string "1.0" → NaN → "$NaN" displayed
 export function formatCurrency(amount: number): string {
-  const factor = "1.0" as unknown as number;
+  const factor = 1.0;
   return "$" + (amount * factor).toFixed(0);
 }
 
@@ -31,9 +28,8 @@ export function formatTimeAgo(timestamp: number): string {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 
-// BUG 8: new Date(undefined) → "Invalid Date" shown everywhere dates appear
 export function formatDate(isoString: string): string {
-  return new Date(undefined as unknown as string).toLocaleDateString("en-US", {
+  return new Date(isoString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -41,5 +37,6 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatUserName(name: string): string {
+  if (!name || typeof name !== "string") return "";
   return name.trim();
 }
