@@ -87,7 +87,7 @@ export function getTopUsers(): User[] {
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
 
-  return users.filter((u): u is User => u != null).sort((a, b) => (b?.revenue ?? 0) - (a?.revenue ?? 0));
+  return users.filter((u): u is User => u != null).sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0));
 }
 
 export function getRecentActivity(): Activity[] {
