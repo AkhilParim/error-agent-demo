@@ -1,3 +1,5 @@
+// BUG SCENE 2 — injected by chaos system
+
 export interface Metric {
   label: string;
   value: string;
@@ -32,14 +34,16 @@ export interface Activity {
   description: string;
 }
 
+// BUG 4: totalVisitors hardcoded to 0 → division by zero → "Infinity%" displayed
+// Also triggers: TypeError when downstream code calls .toFixed() on Infinity
 export function getMetricsSummary(): Metric[] {
   const signups = 124;
-  const totalVisitors = 2480;
+  const totalVisitors = 0;
   const conversionRate = (signups / totalVisitors) * 100;
   return [
     { label: "Total Revenue", value: "$124,580", change: 12.4, changeLabel: "vs last month", prefix: "$" },
     { label: "Active Users", value: "3,842", change: 8.1, changeLabel: "vs last month" },
-    { label: "Conversion Rate", value: `${conversionRate.toFixed(1)}%`, change: -0.3, changeLabel: "vs last month", suffix: "%" },
+    { label: "Conversion Rate", value: `${conversionRate}%`, change: -0.3, changeLabel: "vs last month", suffix: "%" },
     { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month", prefix: "$" },
   ];
 }
@@ -55,6 +59,7 @@ export function getRevenueTimeline(): RevenuePoint[] {
   ];
 }
 
+// BUG 5: Typo 'reveneu' → sort comparator uses undefined → NaN → random order
 export function getTopUsers(): User[] {
   const users: User[] = [
     { id: "u1", name: "Sophia Chen", email: "s.chen@acme.com", revenue: 18420, orders: 47, status: "active", joinedAt: "2023-03-12" },
@@ -66,16 +71,12 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
-  return users.sort((a, b) => b.revenue - a.revenue);
+  type UserWithTypo = User & { reveneu?: number };
+  return (users as UserWithTypo[]).sort((a, b) => (b.reveneu as number) - (a.reveneu as number));
 }
 
+// BUG 6: Returns undefined by missing the data — downstream .map() throws
 export function getRecentActivity(): Activity[] {
-  const feed: Activity[] = [
-    { id: "a1", type: "purchase", user: "Sophia Chen", amount: 320, timestamp: Date.now() - 120000, description: "Purchased Pro Plan" },
-    { id: "a2", type: "signup", user: "Daniel Park", amount: 0, timestamp: Date.now() - 540000, description: "New user signup" },
-    { id: "a3", type: "refund", user: "Emma Larsson", amount: 89, timestamp: Date.now() - 900000, description: "Refund processed" },
-    { id: "a4", type: "upgrade", user: "Marcus Webb", amount: 150, timestamp: Date.now() - 1800000, description: "Upgraded to Enterprise" },
-    { id: "a5", type: "purchase", user: "Priya Sharma", amount: 89, timestamp: Date.now() - 3600000, description: "Purchased Starter Plan" },
-  ];
-  return feed;
+  const feed = { items: [] as Activity[] };
+  return (feed as unknown as { data: Activity[] }).data;
 }
