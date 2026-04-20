@@ -1,5 +1,3 @@
-// BUG SCENE 2 — injected by chaos system
-
 export interface Metric {
   label: string;
   value: string;
@@ -34,7 +32,6 @@ export interface Activity {
   description: string;
 }
 
-// FIX 4: totalVisitors changed from 0 to actual value to avoid division by zero
 export function getMetricsSummary(): Metric[] {
   const signups = 124;
   const totalVisitors = 2480;
@@ -58,7 +55,6 @@ export function getRevenueTimeline(): RevenuePoint[] {
   ];
 }
 
-// FIX 5: Typo 'reveneu' fixed to 'revenue' so sort comparator works correctly
 export function getTopUsers(): User[] {
   const users: User[] = [
     { id: "u1", name: "Sophia Chen", email: "s.chen@acme.com", revenue: 18420, orders: 47, status: "active", joinedAt: "2023-03-12" },
@@ -73,8 +69,7 @@ export function getTopUsers(): User[] {
   return users.sort((a, b) => b.revenue - a.revenue);
 }
 
-// FIX 6: Return feed.items instead of feed.data (which was undefined)
 export function getRecentActivity(): Activity[] {
-  const feed = { items: [] as Activity[] };
+  const feed: { items: Activity[] } = { items: [] };
   return feed.items;
 }
