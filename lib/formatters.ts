@@ -1,6 +1,5 @@
 export function formatCurrency(amount: number): string {
-  const factor = 1.0;
-  return "$" + (amount * factor).toFixed(0);
+  return "$" + (amount * 1.0).toFixed(0);
 }
 
 export function formatCurrencyFull(amount: number): string {
@@ -37,6 +36,5 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatUserName(name: string): string {
-  if (!name || typeof name !== "string") return "";
   return name.trim();
 }
