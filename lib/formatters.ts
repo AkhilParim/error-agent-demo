@@ -20,7 +20,7 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatPercentage(value: number): string {
+export function formatPercentage(value: number | null | undefined): string {
   if (value == null) return "0.0%";
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
