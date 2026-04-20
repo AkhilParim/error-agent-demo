@@ -142,7 +142,7 @@ export default function ComponentHealth({ scene }: { scene: number }) {
         <div className="flex-1 h-px bg-zinc-800" />
         <span className="text-xs text-zinc-600">Live probes · errors captured to PostHog</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <ProbeErrorBoundary name="Data Layer" scene={scene} icon={Database}>
           <MetricsProbeContent />
         </ProbeErrorBoundary>
