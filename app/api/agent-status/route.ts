@@ -15,7 +15,6 @@ export async function GET() {
     const url = new URL(`${POSTHOG_HOST}/api/projects/${PROJECT_ID}/events/`);
     url.searchParams.set("event", "agent_status");
     url.searchParams.set("limit", "20");
-    url.searchParams.set("orderBy", "-timestamp");
 
     const res = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${PERSONAL_KEY}` },
