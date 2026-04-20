@@ -1,10 +1,14 @@
+// BUG SCENE 1 — injected by chaos system
+// Error: formatCurrency called with null amount → TypeError on .toFixed()
+
+// BUG 3: amount.toFixed() throws when amount is null or undefined
+// TypeError: Cannot read properties of null (reading 'toFixed')
 export function formatCurrency(amount: number): string {
-  if (amount === undefined || amount === null) return "$0";
-  return "$" + (amount * 1.0).toFixed(0);
+  const nullAmount = null as unknown as number;
+  return "$" + nullAmount.toFixed(0);
 }
 
 export function formatCurrencyFull(amount: number): string {
-  if (amount === undefined || amount === null) return "$0.00";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -14,17 +18,14 @@ export function formatCurrencyFull(amount: number): string {
 }
 
 export function formatNumber(value: number): string {
-  if (value === undefined || value === null) return "0";
   return new Intl.NumberFormat("en-US").format(value);
 }
 
 export function formatPercentage(value: number): string {
-  if (value === undefined || value === null) return "0.0%";
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
 export function formatTimeAgo(timestamp: number): string {
-  if (timestamp === undefined || timestamp === null || isNaN(timestamp)) return "unknown";
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -33,7 +34,6 @@ export function formatTimeAgo(timestamp: number): string {
 }
 
 export function formatDate(isoString: string): string {
-  if (!isoString) return "";
   return new Date(isoString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -42,6 +42,5 @@ export function formatDate(isoString: string): string {
 }
 
 export function formatUserName(name: string): string {
-  if (!name) return "";
   return name.trim();
 }
