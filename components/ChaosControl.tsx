@@ -226,7 +226,11 @@ export default function ChaosControl() {
           {isDeploying ? (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 text-zinc-400 cursor-not-allowed select-none">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {isFixing ? "Deploying Claude's fix…" : "Deploying errors…"}
+              {phase?.kind === "analyzing"
+                ? "Claude fixing…"
+                : isFixing
+                ? "Deploying fix…"
+                : "Deploying errors…"}
             </div>
           ) : state.active ? (
             <button

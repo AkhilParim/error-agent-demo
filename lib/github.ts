@@ -18,36 +18,64 @@ async function getHeaders() {
   };
 }
 
-async function getFileSha(path: string): Promise<string | null> {
-  const headers = await getHeaders();
-  const res = await fetch(`${BASE_URL}/repos/${OWNER}/${REPO}/contents/${path}`, { headers });
-  if (res.status === 404) return null;
-  const data = await res.json();
-  return data.sha ?? null;
-}
-
+// Uses the Git Trees API to create ONE atomic commit for all file changes.
+// This means one Vercel deployment instead of N (one per file).
 export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: string) {
   const headers = await getHeaders();
+  const base = `${BASE_URL}/repos/${OWNER}/${REPO}`;
 
-  for (const update of updates) {
-    const sha = await getFileSha(update.path);
-    const body: Record<string, unknown> = {
-      message: commitMessage,
-      content: Buffer.from(update.content).toString("base64"),
-    };
-    if (sha) body.sha = sha;
+  // 1. Get current HEAD commit SHA on main
+  const refRes = await fetch(`${base}/git/ref/heads/main`, { headers });
+  if (!refRes.ok) throw new Error(`Failed to get ref: ${refRes.status}`);
+  const { object: { sha: headSha } } = await refRes.json();
 
-    const res = await fetch(`${BASE_URL}/repos/${OWNER}/${REPO}/contents/${update.path}`, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(body),
-    });
+  // 2. Get the tree SHA that HEAD commit points to
+  const commitRes = await fetch(`${base}/git/commits/${headSha}`, { headers });
+  if (!commitRes.ok) throw new Error(`Failed to get commit: ${commitRes.status}`);
+  const { tree: { sha: baseSha } } = await commitRes.json();
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(`GitHub API error for ${update.path}: ${JSON.stringify(err)}`);
-    }
-  }
+  // 3. Create a blob for each file (in parallel)
+  const treeItems = await Promise.all(
+    updates.map(async (update) => {
+      const blobRes = await fetch(`${base}/git/blobs`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          content: Buffer.from(update.content).toString("base64"),
+          encoding: "base64",
+        }),
+      });
+      if (!blobRes.ok) throw new Error(`Failed to create blob for ${update.path}: ${blobRes.status}`);
+      const { sha: blobSha } = await blobRes.json();
+      return { path: update.path, mode: "100644", type: "blob", sha: blobSha };
+    })
+  );
+
+  // 4. Create a new tree on top of the existing one
+  const newTreeRes = await fetch(`${base}/git/trees`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
+  });
+  if (!newTreeRes.ok) throw new Error(`Failed to create tree: ${newTreeRes.status}`);
+  const { sha: newTreeSha } = await newTreeRes.json();
+
+  // 5. Create the commit
+  const newCommitRes = await fetch(`${base}/git/commits`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ message: commitMessage, tree: newTreeSha, parents: [headSha] }),
+  });
+  if (!newCommitRes.ok) throw new Error(`Failed to create commit: ${newCommitRes.status}`);
+  const { sha: newCommitSha } = await newCommitRes.json();
+
+  // 6. Fast-forward the branch ref
+  const updateRes = await fetch(`${base}/git/refs/heads/main`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ sha: newCommitSha }),
+  });
+  if (!updateRes.ok) throw new Error(`Failed to update ref: ${updateRes.status}`);
 }
 
 export async function getFileContent(path: string): Promise<string> {

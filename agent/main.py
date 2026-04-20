@@ -15,7 +15,7 @@ from rich.text import Text
 
 from posthog_client import get_recent_exceptions, capture_agent_status
 from fixer import fix_errors_with_claude
-from github_client import commit_fixes
+from github_client import commit_fixes, get_chaos_state
 
 load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
@@ -63,7 +63,19 @@ def main():
             if not exceptions:
                 log("info", "No new exceptions · Monitoring...")
                 capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
-            else:
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
+            # Check GitHub to confirm errors are still active before invoking Claude.
+            # This prevents re-fixing after the UI button or a prior agent run already fixed it.
+            chaos = get_chaos_state()
+            if not chaos.get("active", False):
+                log("info", "Chaos state is inactive — exceptions are stale, skipping fix")
+                capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
+                time.sleep(POLL_INTERVAL_SECONDS)
+                continue
+
+            if True:
                 log("warning", f"[bold]{len(exceptions)} exception(s) detected[/bold]")
 
                 for exc in exceptions[:3]:
@@ -117,9 +129,10 @@ def main():
                 log("success", "Vercel is redeploying now (~30s)")
                 console.print()
 
-                # Back off after a successful fix to avoid refixing during Vercel redeploy
-                log("info", "Backing off 90s to allow Vercel redeploy...")
-                time.sleep(90)
+                # Back off after a successful fix — long enough for Vercel to redeploy
+                # and for PostHog to stop receiving the now-fixed errors.
+                log("info", "Backing off 180s to allow Vercel redeploy + PostHog drain...")
+                time.sleep(180)
                 continue
 
         except KeyboardInterrupt:
