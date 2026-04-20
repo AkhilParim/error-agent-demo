@@ -1,6 +1,3 @@
-// BUG SCENE 1 — injected by chaos system
-// Errors: null reference in getMetricsSummary, wrong property in getRevenueTimeline
-
 export interface Metric {
   label: string;
   value: string;
@@ -35,34 +32,47 @@ export interface Activity {
   description: string;
 }
 
-// BUG 1: apiResponse is null — simulates a failed cache lookup
-// Accessing .revenue on null throws: TypeError: Cannot read properties of null (reading 'revenue')
 export function getMetricsSummary(): Metric[] {
-  const apiResponse = null as unknown as { revenue: string; users: string; conversion: string; avgOrder: string };
   return [
-    { label: "Total Revenue", value: apiResponse.revenue, change: 12.4, changeLabel: "vs last month", prefix: "$" },
-    { label: "Active Users", value: apiResponse.users, change: 8.1, changeLabel: "vs last month" },
-    { label: "Conversion Rate", value: apiResponse.conversion, change: -0.3, changeLabel: "vs last month", suffix: "%" },
-    { label: "Avg. Order Value", value: apiResponse.avgOrder, change: 4.7, changeLabel: "vs last month", prefix: "$" },
+    {
+      label: "Total Revenue",
+      value: "$124,580",
+      change: 12.4,
+      changeLabel: "vs last month",
+      prefix: "$",
+    },
+    {
+      label: "Active Users",
+      value: "3,842",
+      change: 8.1,
+      changeLabel: "vs last month",
+    },
+    {
+      label: "Conversion Rate",
+      value: "3.24%",
+      change: -0.3,
+      changeLabel: "vs last month",
+      suffix: "%",
+    },
+    {
+      label: "Avg. Order Value",
+      value: "$89.50",
+      change: 4.7,
+      changeLabel: "vs last month",
+      prefix: "$",
+    },
   ];
 }
 
-// BUG 2: .entries does not exist on this object — returns undefined
-// Downstream .map() call throws: TypeError: Cannot read properties of undefined (reading 'map')
 export function getRevenueTimeline(): RevenuePoint[] {
-  const data = {
-    revenue: {
-      monthly: [
-        { month: "Nov", revenue: 89200, target: 85000 },
-        { month: "Dec", revenue: 104300, target: 95000 },
-        { month: "Jan", revenue: 98700, target: 100000 },
-        { month: "Feb", revenue: 112400, target: 108000 },
-        { month: "Mar", revenue: 118900, target: 115000 },
-        { month: "Apr", revenue: 124580, target: 120000 },
-      ],
-    },
-  };
-  return (data.revenue.monthly as unknown as { entries: RevenuePoint[] }).entries;
+  return [
+    { month: "Nov", revenue: 89200, target: 85000 },
+    { month: "Dec", revenue: 104300, target: 95000 },
+    { month: "Jan", revenue: 98700, target: 100000 },
+    { month: "Feb", revenue: 112400, target: 108000 },
+    { month: "Mar", revenue: 118900, target: 115000 },
+    { month: "Apr", revenue: 124580, target: 120000 },
+  ];
 }
 
 export function getTopUsers(): User[] {
@@ -76,6 +86,7 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
+
   return users.sort((a, b) => b.revenue - a.revenue);
 }
 
