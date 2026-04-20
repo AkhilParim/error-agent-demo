@@ -1,3 +1,5 @@
+// BUG SCENE 2 — injected by chaos system
+
 export interface Metric {
   label: string;
   value: string;
@@ -32,35 +34,17 @@ export interface Activity {
   description: string;
 }
 
+// BUG 4: totalVisitors hardcoded to 0 → division by zero → "Infinity%" displayed
+// Also triggers: TypeError when downstream code calls .toFixed() on Infinity
 export function getMetricsSummary(): Metric[] {
+  const signups = 124;
+  const totalVisitors = 0;
+  const conversionRate = (signups / totalVisitors) * 100;
   return [
-    {
-      label: "Total Revenue",
-      value: "$124,580",
-      change: 12.4,
-      changeLabel: "vs last month",
-      prefix: "$",
-    },
-    {
-      label: "Active Users",
-      value: "3,842",
-      change: 8.1,
-      changeLabel: "vs last month",
-    },
-    {
-      label: "Conversion Rate",
-      value: "3.24%",
-      change: -0.3,
-      changeLabel: "vs last month",
-      suffix: "%",
-    },
-    {
-      label: "Avg. Order Value",
-      value: "$89.50",
-      change: 4.7,
-      changeLabel: "vs last month",
-      prefix: "$",
-    },
+    { label: "Total Revenue", value: "$124,580", change: 12.4, changeLabel: "vs last month", prefix: "$" },
+    { label: "Active Users", value: "3,842", change: 8.1, changeLabel: "vs last month" },
+    { label: "Conversion Rate", value: `${conversionRate}%`, change: -0.3, changeLabel: "vs last month", suffix: "%" },
+    { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month", prefix: "$" },
   ];
 }
 
@@ -75,8 +59,9 @@ export function getRevenueTimeline(): RevenuePoint[] {
   ];
 }
 
+// BUG 5: Typo 'reveneu' → sort comparator uses undefined → NaN → random order
 export function getTopUsers(): User[] {
-  const users: (User | null)[] = [
+  const users: User[] = [
     { id: "u1", name: "Sophia Chen", email: "s.chen@acme.com", revenue: 18420, orders: 47, status: "active", joinedAt: "2023-03-12" },
     { id: "u2", name: "Marcus Webb", email: "m.webb@globex.io", revenue: 15830, orders: 39, status: "active", joinedAt: "2023-05-08" },
     { id: "u3", name: "Aiko Tanaka", email: "a.tanaka@nexus.co", revenue: 14290, orders: 33, status: "active", joinedAt: "2023-01-22" },
@@ -86,19 +71,12 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
-
-  return users.filter((u): u is User => u != null).sort((a, b) => (b.revenue ?? 0) - (a.revenue ?? 0));
+  type UserWithTypo = User & { reveneu?: number };
+  return (users as UserWithTypo[]).sort((a, b) => (b.reveneu as number) - (a.reveneu as number));
 }
 
+// BUG 6: Returns undefined by missing the data — downstream .map() throws
 export function getRecentActivity(): Activity[] {
-  const now = Date.now();
-  return [
-    { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Pro Plan — Annual" },
-    { id: "a2", type: "signup", user: "Daniel Park", timestamp: now - 480000, description: "New user registered" },
-    { id: "a3", type: "upgrade", user: "Marcus Webb", amount: 180, timestamp: now - 900000, description: "Starter → Business" },
-    { id: "a4", type: "refund", user: "Emma Larsson", amount: -89, timestamp: now - 1800000, description: "Refund processed" },
-    { id: "a5", type: "purchase", user: "Aiko Tanaka", amount: 89, timestamp: now - 2700000, description: "Starter Plan — Monthly" },
-    { id: "a6", type: "signup", user: "Felix Wagner", timestamp: now - 3600000, description: "New user registered" },
-    { id: "a7", type: "purchase", user: "Lena Müller", amount: 270, timestamp: now - 5400000, description: "Business Plan — Quarterly" },
-  ];
+  const feed = { items: [] as Activity[] };
+  return (feed as unknown as { data: Activity[] }).data;
 }
