@@ -27,16 +27,14 @@ const SCENE_FILES: Record<number, SceneFile[]> = {
 };
 
 export async function GET() {
-  try {
-    const raw = await getFileContent("chaos-state.json");
-    return NextResponse.json(JSON.parse(raw));
-  } catch {
-    const statePath = path.join(ROOT, "chaos-state.json");
-    const state = existsSync(statePath)
-      ? JSON.parse(readFileSync(statePath, "utf-8"))
-      : { active: false, scene: 0 };
-    return NextResponse.json(state);
-  }
+  // Read from the deployed filesystem — this ensures chaos-state and component
+  // health are always in sync (both reflect the same Vercel deployment).
+  // The polling in ChaosControl uses /api/deployed-state for the same reason.
+  const statePath = path.join(ROOT, "chaos-state.json");
+  const state = existsSync(statePath)
+    ? JSON.parse(readFileSync(statePath, "utf-8"))
+    : { active: false, scene: 0 };
+  return NextResponse.json(state, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(req: NextRequest) {
