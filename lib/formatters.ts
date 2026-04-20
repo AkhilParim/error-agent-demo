@@ -4,6 +4,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatCurrencyFull(amount: number): string {
+  if (amount === undefined || amount === null) return "$0.00";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -13,10 +14,12 @@ export function formatCurrencyFull(amount: number): string {
 }
 
 export function formatNumber(value: number): string {
+  if (value === undefined || value === null) return "0";
   return new Intl.NumberFormat("en-US").format(value);
 }
 
 export function formatPercentage(value: number): string {
+  if (value === undefined || value === null) return "0.0%";
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
