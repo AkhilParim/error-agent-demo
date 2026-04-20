@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
-import { commitFiles } from "@/lib/github";
+import { commitFiles, getFileContent } from "@/lib/github";
 
 const ROOT = path.resolve(/* turbopackIgnore: true */ process.cwd());
 const SCENES = 3;
@@ -28,13 +28,9 @@ const SCENE_FILES: Record<number, SceneFile[]> = {
 
 export async function GET() {
   try {
-    // Read from GitHub so we always get the latest committed state,
-    // regardless of which Vercel deployment is currently serving.
-    const { getFileContent } = await import("@/lib/github");
     const raw = await getFileContent("chaos-state.json");
     return NextResponse.json(JSON.parse(raw));
   } catch {
-    // Fallback to local filesystem (e.g. during local dev or if GitHub token missing)
     const statePath = path.join(ROOT, "chaos-state.json");
     const state = existsSync(statePath)
       ? JSON.parse(readFileSync(statePath, "utf-8"))
@@ -51,10 +47,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unknown action" }, { status: 400 });
     }
 
-    const statePath = path.join(ROOT, "chaos-state.json");
-    const currentState = existsSync(statePath)
-      ? JSON.parse(readFileSync(statePath, "utf-8"))
-      : { active: false, scene: 0 };
+    // Always read current state from GitHub — the filesystem snapshot on the
+    // deployed Vercel instance can be stale (e.g. if the last deploy was from
+    // a different chaos state).
+    let currentState: { active: boolean; scene: number } = { active: false, scene: 0 };
+    try {
+      const raw = await getFileContent("chaos-state.json");
+      currentState = JSON.parse(raw);
+    } catch {
+      // fall back to filesystem if GitHub token isn't configured
+      const statePath = path.join(ROOT, "chaos-state.json");
+      if (existsSync(statePath)) currentState = JSON.parse(readFileSync(statePath, "utf-8"));
+    }
 
     const nextScene = (currentState.scene % SCENES) + 1;
     const files = SCENE_FILES[nextScene];

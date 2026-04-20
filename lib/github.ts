@@ -24,14 +24,20 @@ export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: st
   const headers = await getHeaders();
   const base = `${BASE_URL}/repos/${OWNER}/${REPO}`;
 
-  // 1. Get current HEAD commit SHA on main
-  const refRes = await fetch(`${base}/git/ref/heads/main`, { headers });
-  if (!refRes.ok) throw new Error(`Failed to get ref: ${refRes.status}`);
+  // 1. Get current HEAD commit SHA on main (/git/refs/ plural is the documented endpoint)
+  const refRes = await fetch(`${base}/git/refs/heads/main`, { headers });
+  if (!refRes.ok) {
+    const body = await refRes.text();
+    throw new Error(`Failed to get ref: ${refRes.status} — ${body}`);
+  }
   const { object: { sha: headSha } } = await refRes.json();
 
   // 2. Get the tree SHA that HEAD commit points to
   const commitRes = await fetch(`${base}/git/commits/${headSha}`, { headers });
-  if (!commitRes.ok) throw new Error(`Failed to get commit: ${commitRes.status}`);
+  if (!commitRes.ok) {
+    const body = await commitRes.text();
+    throw new Error(`Failed to get commit: ${commitRes.status} — ${body}`);
+  }
   const { tree: { sha: baseSha } } = await commitRes.json();
 
   // 3. Create a blob for each file (in parallel)
@@ -45,7 +51,10 @@ export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: st
           encoding: "base64",
         }),
       });
-      if (!blobRes.ok) throw new Error(`Failed to create blob for ${update.path}: ${blobRes.status}`);
+      if (!blobRes.ok) {
+        const body = await blobRes.text();
+        throw new Error(`Failed to create blob for ${update.path}: ${blobRes.status} — ${body}`);
+      }
       const { sha: blobSha } = await blobRes.json();
       return { path: update.path, mode: "100644", type: "blob", sha: blobSha };
     })
@@ -57,7 +66,10 @@ export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: st
     headers,
     body: JSON.stringify({ base_tree: baseSha, tree: treeItems }),
   });
-  if (!newTreeRes.ok) throw new Error(`Failed to create tree: ${newTreeRes.status}`);
+  if (!newTreeRes.ok) {
+    const body = await newTreeRes.text();
+    throw new Error(`Failed to create tree: ${newTreeRes.status} — ${body}`);
+  }
   const { sha: newTreeSha } = await newTreeRes.json();
 
   // 5. Create the commit
@@ -66,7 +78,10 @@ export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: st
     headers,
     body: JSON.stringify({ message: commitMessage, tree: newTreeSha, parents: [headSha] }),
   });
-  if (!newCommitRes.ok) throw new Error(`Failed to create commit: ${newCommitRes.status}`);
+  if (!newCommitRes.ok) {
+    const body = await newCommitRes.text();
+    throw new Error(`Failed to create commit: ${newCommitRes.status} — ${body}`);
+  }
   const { sha: newCommitSha } = await newCommitRes.json();
 
   // 6. Fast-forward the branch ref
@@ -75,7 +90,10 @@ export async function commitFiles(updates: GitHubFileUpdate[], commitMessage: st
     headers,
     body: JSON.stringify({ sha: newCommitSha }),
   });
-  if (!updateRes.ok) throw new Error(`Failed to update ref: ${updateRes.status}`);
+  if (!updateRes.ok) {
+    const body = await updateRes.text();
+    throw new Error(`Failed to update ref: ${updateRes.status} — ${body}`);
+  }
 }
 
 export async function getFileContent(path: string): Promise<string> {

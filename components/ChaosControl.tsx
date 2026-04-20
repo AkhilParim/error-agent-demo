@@ -32,6 +32,7 @@ export default function ChaosControl() {
   const [state, setState] = useState<ChaosState>({ active: false, scene: 0, timestamp: null, injectedFiles: [] });
   const [loading, setLoading] = useState(false);
   const [phase, setPhase] = useState<DeployPhase>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -93,6 +94,7 @@ export default function ChaosControl() {
     setPhase({ kind: "committing", intent: "inject" });
 
     try {
+      setLastError(null);
       // Snapshot the timestamp that is currently deployed BEFORE committing
       const priorRes = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
       const prior: ChaosState = await priorRes.json().catch(() => ({ timestamp: null }));
@@ -108,7 +110,9 @@ export default function ChaosControl() {
       setState((prev) => ({ ...prev, active: true, scene: data.scene, injectedFiles: data.files }));
       startPollingForDeploy("inject", prior.timestamp ?? null);
     } catch (e) {
-      console.error("Inject failed:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Inject failed:", msg);
+      setLastError(msg);
       setPhase(null);
     } finally {
       setLoading(false);
@@ -133,7 +137,9 @@ export default function ChaosControl() {
       // Step 3: Claude committed the fix — now wait for Vercel to redeploy
       startPollingForDeploy("fix", prior.timestamp ?? null);
     } catch (e) {
-      console.error("Fix failed:", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("Fix failed:", msg);
+      setLastError(msg);
       setPhase(null);
     }
   }
@@ -253,7 +259,14 @@ export default function ChaosControl() {
         </div>
       </div>
 
-      {!state.active && !isDeploying && (
+      {lastError && !isDeploying && (
+        <div className="mt-3 flex items-start gap-2 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+          <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0 mt-0.5" />
+          <p className="text-[11px] text-yellow-300 font-mono break-all">{lastError}</p>
+        </div>
+      )}
+
+      {!state.active && !isDeploying && !lastError && (
         <div className="mt-4 pt-4 border-t border-zinc-800/50 flex items-center gap-2 text-xs text-zinc-600">
           <AlertTriangle className="h-3 w-3" />
           <span>Next: Scene {nextScene} — {SCENE_DESCRIPTIONS[nextScene]}</span>
