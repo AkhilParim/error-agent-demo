@@ -76,5 +76,5 @@ export function getRecentActivity(): Activity[] {
     { id: "a3", type: "refund", user: "Marcus Webb", amount: 89, timestamp: Date.now() - 600000, description: "Refund requested" },
     { id: "a4", type: "upgrade", user: "Aiko Tanaka", amount: 199, timestamp: Date.now() - 900000, description: "Upgraded to Enterprise" },
   ];
-  return items;
+  return items || [];
 }
