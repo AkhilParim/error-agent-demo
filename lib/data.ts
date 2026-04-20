@@ -27,7 +27,7 @@ export interface Activity {
   id: string;
   type: "purchase" | "signup" | "refund" | "upgrade";
   user: string;
-  amount?: number;
+  amount: number;
   timestamp: number;
   description: string;
 }
