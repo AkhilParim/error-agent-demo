@@ -139,7 +139,11 @@ export default function ChaosControl() {
   }
 
   const isDeploying = phase !== null;
-  const intent = phase?.kind !== null ? (phase as { intent?: Intent })?.intent : null;
+  // Safe intent extraction — "analyzing" has no intent field but always means "fix"
+  const intent: Intent | null =
+    phase === null ? null :
+    phase.kind === "analyzing" ? "fix" :
+    (phase as { intent?: Intent }).intent ?? null;
   const elapsed = phase?.kind === "deploying" ? phase.elapsed : null;
   const nextScene = (state.scene % 3) + 1;
 
@@ -155,8 +159,8 @@ export default function ChaosControl() {
     return "";
   }
 
-  const isFixing = phase?.kind === "analyzing" || (phase?.kind !== "committing" && phase?.kind !== null && (phase as {intent?: Intent}).intent === "fix");
-  const isInjecting = !isFixing && isDeploying;
+  const isFixing = intent === "fix" && isDeploying;
+  const isInjecting = intent === "inject" && isDeploying;
 
   const borderColor =
     isFixing ? "border-emerald-500/30 bg-emerald-500/5" :
