@@ -1,9 +1,7 @@
 {
-  "active": true,
-  "scene": 1,
-  "timestamp": "2026-04-22T13:16:37.744Z",
-  "injectedFiles": [
-    "lib/data.ts",
-    "lib/formatters.ts"
-  ]
+  "active": false,
+  "scene": 0,
+  "timestamp": "2026-04-22T13:17:54.426542Z",
+  "injectedFiles": [],
+  "fixedBy": "claude-agent"
 }
