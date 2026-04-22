@@ -60,16 +60,16 @@ def main():
             exceptions = get_recent_exceptions(since=since, limit=20)
 
             if not exceptions:
-                log("info", "No new exceptions · Monitoring...")
+                log("info", "No exceptions · Monitoring...")
                 capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
 
             # Confirm errors are still active in GitHub before invoking Claude.
-            # Prevents re-fixing after a prior run already fixed it.
+            # Prevents re-fixing stale PostHog events that linger after a fix.
             chaos = get_chaos_state()
             if not chaos.get("active", False):
-                log("info", "Chaos state is inactive — exceptions are stale, skipping")
+                log("info", f"{len(exceptions)} stale exception(s) in lookback window — chaos inactive, ignoring")
                 capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
@@ -125,9 +125,9 @@ def main():
             log("success", "Vercel is redeploying now (~30s)")
             console.print()
 
-            # Back off long enough for Vercel to redeploy and PostHog to drain
-            # the now-fixed errors so we don't re-trigger immediately.
-            log("info", "Backing off 180s to allow Vercel redeploy + PostHog drain...")
+            # Wait for Vercel to finish redeploying and for PostHog's 5-min lookback
+            # window to clear, so we don't re-trigger on the same stale events.
+            log("info", "Waiting 3 min for Vercel redeploy + PostHog lookback to clear...")
             time.sleep(180)
             continue
 
