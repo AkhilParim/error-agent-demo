@@ -33,7 +33,7 @@ export interface Activity {
 }
 
 export function getMetricsSummary(): Metric[] {
-  const apiResponse = { revenue: "124,580", users: "3,842", conversion: "4.7", avgOrder: "86" };
+  const apiResponse = { revenue: "124,580", users: "3,842", conversion: "3.6", avgOrder: "142" };
   return [
     { label: "Total Revenue", value: apiResponse.revenue, change: 12.4, changeLabel: "vs last month", prefix: "$" },
     { label: "Active Users", value: apiResponse.users, change: 8.1, changeLabel: "vs last month" },
