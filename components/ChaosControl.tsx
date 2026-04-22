@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Zap, AlertTriangle, Loader2, Wrench, Rocket } from "lucide-react";
+import { Zap, AlertTriangle, Loader2, Rocket, Bot } from "lucide-react";
 
 interface ChaosState {
   active: boolean;
@@ -10,14 +10,13 @@ interface ChaosState {
   injectedFiles: string[];
 }
 
-type Intent = "inject" | "fix";
-
 type DeployPhase =
   | null
-  | { kind: "committing"; intent: Intent }
-  | { kind: "analyzing" }                              // Claude is analyzing errors
-  | { kind: "deploying"; intent: Intent; elapsed: number }
-  | { kind: "reloading"; intent: Intent };
+  | { kind: "committing" }
+  | { kind: "deploying_errors"; elapsed: number }
+  | { kind: "monitoring" }          // errors live, agent is watching
+  | { kind: "deploying_fix"; elapsed: number }  // agent committed fix, waiting for redeploy
+  | { kind: "reloading" };
 
 const SCENE_DESCRIPTIONS: Record<number, string> = {
   1: "Null refs in data layer + currency formatter crash",
@@ -36,66 +35,102 @@ export default function ChaosControl() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // On mount, load chaos state. If already active (e.g. page reload mid-flow),
+  // jump straight into monitoring so the UI reflects agent activity.
   useEffect(() => {
     fetch("/api/chaos")
       .then((r) => r.json())
-      .then(setState)
+      .then((s: ChaosState) => {
+        setState(s);
+        if (s.active) {
+          setPhase({ kind: "monitoring" });
+          startPollingForFixDeploy();
+        }
+      })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    };
+    return () => stopTimers();
   }, []);
 
   function stopTimers() {
     if (pollRef.current) clearInterval(pollRef.current);
     if (elapsedRef.current) clearInterval(elapsedRef.current);
+    pollRef.current = null;
+    elapsedRef.current = null;
   }
 
-  // Poll /api/deployed-state (reads the currently-live Vercel filesystem).
-  // When the committed timestamp differs from what was live before the commit,
-  // the new Vercel deployment is serving — safe to reload.
-  function startPollingForDeploy(intent: Intent, priorTimestamp: string | null) {
-    setPhase({ kind: "deploying", intent, elapsed: 0 });
+  // Phase 1 — wait for the error-injection deploy to go live.
+  // Detects by timestamp change vs the pre-commit snapshot.
+  function startPollingForErrorDeploy(priorTimestamp: string | null) {
+    setPhase({ kind: "deploying_errors", elapsed: 0 });
 
     let elapsed = 0;
     elapsedRef.current = setInterval(() => {
       elapsed += 1;
-      setPhase((p) => p?.kind === "deploying" ? { ...p, elapsed } : p);
+      setPhase((p) => p?.kind === "deploying_errors" ? { kind: "deploying_errors", elapsed } : p);
     }, 1000);
 
     pollRef.current = setInterval(async () => {
       try {
-        // Cache-bust so we always hit the live deployment, not a CDN cache
+        const res = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
+        const deployed: ChaosState = await res.json();
+        const isNewDeploy = deployed.timestamp !== priorTimestamp || elapsed >= MAX_WAIT_S;
+        if (isNewDeploy) {
+          stopTimers();
+          setState(deployed);
+          setPhase({ kind: "monitoring" });
+          startPollingForFixDeploy();
+        }
+      } catch {
+        // transient — keep polling
+      }
+    }, POLL_MS);
+  }
+
+  // Phase 2 — errors are live, wait for the agent to commit a fix and redeploy.
+  // Detects by chaos.active flipping to false in the deployed filesystem.
+  function startPollingForFixDeploy() {
+    let elapsed = 0;
+    let fixDeployStarted = false;
+
+    pollRef.current = setInterval(async () => {
+      try {
         const res = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
         const deployed: ChaosState = await res.json();
 
-        // The new deploy is live when its chaos-state timestamp has changed
-        const isNewDeploy =
-          deployed.timestamp !== priorTimestamp ||
-          elapsed >= MAX_WAIT_S;
-
-        if (isNewDeploy) {
+        if (!deployed.active && !fixDeployStarted) {
+          // Agent committed the fix and Vercel has redeployed — reload.
+          fixDeployStarted = true;
           stopTimers();
-          setPhase({ kind: "reloading", intent });
+          setPhase({ kind: "reloading" });
           setTimeout(() => window.location.reload(), 600);
+        } else if (deployed.active && !fixDeployStarted) {
+          // Still waiting — check if agent has at least committed (GitHub active=false)
+          // by polling GitHub state via /api/chaos (reads GitHub directly in POST, but
+          // for detection we check deployed-state only — trust Vercel as source of truth).
+          elapsed += POLL_MS / 1000;
+          if (elapsed >= MAX_WAIT_S * 2) {
+            // Safety: give up after 4 min and reload anyway
+            stopTimers();
+            setPhase({ kind: "reloading" });
+            setTimeout(() => window.location.reload(), 600);
+          }
         }
       } catch {
-        // transient network error — keep polling
+        // transient — keep polling
       }
     }, POLL_MS);
   }
 
   async function injectErrors() {
     setLoading(true);
-    setPhase({ kind: "committing", intent: "inject" });
+    setLastError(null);
+    setPhase({ kind: "committing" });
 
     try {
-      setLastError(null);
-      // Snapshot the timestamp that is currently deployed BEFORE committing
       const priorRes = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
       const prior: ChaosState = await priorRes.json().catch(() => ({ timestamp: null }));
 
@@ -108,10 +143,9 @@ export default function ChaosControl() {
       if (!res.ok) throw new Error(data.error ?? "Injection failed");
 
       setState((prev) => ({ ...prev, active: true, scene: data.scene, injectedFiles: data.files }));
-      startPollingForDeploy("inject", prior.timestamp ?? null);
+      startPollingForErrorDeploy(prior.timestamp ?? null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error("Inject failed:", msg);
       setLastError(msg);
       setPhase(null);
     } finally {
@@ -119,68 +153,45 @@ export default function ChaosControl() {
     }
   }
 
-  async function triggerFix() {
-    // Step 1: snapshot what's currently deployed
-    const priorRes = await fetch(`/api/deployed-state?cb=${Date.now()}`, { cache: "no-store" });
-    const prior: ChaosState = await priorRes.json().catch(() => ({ timestamp: null }));
-
-    // Step 2: show "Claude analyzing" while the API calls Claude + commits
-    setPhase({ kind: "analyzing" });
-
-    try {
-      const res = await fetch("/api/fix", { method: "POST" });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error ?? "Fix failed");
-      }
-
-      // Step 3: Claude committed the fix — now wait for Vercel to redeploy
-      startPollingForDeploy("fix", prior.timestamp ?? null);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error("Fix failed:", msg);
-      setLastError(msg);
-      setPhase(null);
-    }
-  }
-
   const isDeploying = phase !== null;
-  // Safe intent extraction — "analyzing" has no intent field but always means "fix"
-  const intent: Intent | null =
-    phase === null ? null :
-    phase.kind === "analyzing" ? "fix" :
-    (phase as { intent?: Intent }).intent ?? null;
-  const elapsed = phase?.kind === "deploying" ? phase.elapsed : null;
   const nextScene = (state.scene % 3) + 1;
 
   function statusLine() {
     if (!phase) return "";
-    if (phase.kind === "reloading") return "Deploy live — reloading page…";
-    if (phase.kind === "analyzing") return "Claude is reading the broken files and generating a fix…";
-    if (phase.kind === "committing") return "Committing error files to GitHub…";
-    if (phase.kind === "deploying") {
-      const action = phase.intent === "fix" ? "Fix committed by Claude" : "Errors injected in the code";
-      return `${action} · Waiting for Vercel Deployment (${elapsed}s)…`;
+    switch (phase.kind) {
+      case "committing":
+        return "Committing error files to GitHub…";
+      case "deploying_errors":
+        return `Errors committed · Waiting for Vercel deployment (${phase.elapsed}s)…`;
+      case "monitoring":
+        return "Errors live · Claude agent monitoring for exceptions…";
+      case "deploying_fix":
+        return `Claude committed a fix · Waiting for Vercel deployment (${phase.elapsed}s)…`;
+      case "reloading":
+        return "Fix deployed — reloading page…";
     }
-    return "";
   }
 
-  const isFixing = intent === "fix" && isDeploying;
-  const isInjecting = intent === "inject" && isDeploying;
+  const isMonitoring = phase?.kind === "monitoring";
+  const isFixing = phase?.kind === "deploying_fix" || phase?.kind === "reloading";
+  const isInjecting = phase?.kind === "committing" || phase?.kind === "deploying_errors";
 
   const borderColor =
     isFixing ? "border-emerald-500/30 bg-emerald-500/5" :
+    isMonitoring ? "border-amber-500/30 bg-amber-500/5" :
     isInjecting ? "border-indigo-500/30 bg-indigo-500/5" :
     state.active ? "border-red-500/30 bg-red-500/5" :
     "border-zinc-800 bg-zinc-900/50";
 
   const iconColor =
     isFixing ? "text-emerald-400" :
+    isMonitoring ? "text-amber-400" :
     isInjecting ? "text-indigo-400" :
     state.active ? "text-red-400" : "text-zinc-500";
 
   const iconBg =
     isFixing ? "bg-emerald-500/15" :
+    isMonitoring ? "bg-amber-500/15" :
     isInjecting ? "bg-indigo-500/15" :
     state.active ? "bg-red-500/10" : "bg-zinc-800";
 
@@ -190,7 +201,9 @@ export default function ChaosControl() {
         {/* Left: icon + text + file badges */}
         <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
           <div className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${iconBg}`}>
-            {isDeploying ? (
+            {isMonitoring ? (
+              <Bot className={`h-4 w-4 ${iconColor}`} />
+            ) : isDeploying ? (
               <Rocket className={`h-4 w-4 ${iconColor}`} />
             ) : (
               <Zap className={`h-4 w-4 ${iconColor}`} />
@@ -227,25 +240,13 @@ export default function ChaosControl() {
           )}
         </div>
 
-        {/* Right: action button */}
+        {/* Right: action button / status indicator */}
         <div className="shrink-0">
           {isDeploying ? (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-zinc-800 text-zinc-400 cursor-not-allowed select-none">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {phase?.kind === "analyzing"
-                ? "Claude fixing…"
-                : isFixing
-                ? "Deploying fix…"
-                : "Deploying errors…"}
+              {isMonitoring ? "Agent watching…" : isFixing ? "Deploying fix…" : "Deploying…"}
             </div>
-          ) : state.active ? (
-            <button
-              onClick={triggerFix}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-500 hover:bg-red-600 text-white transition-all duration-200"
-            >
-              <Wrench className="h-4 w-4" />
-              Fix Errors
-            </button>
           ) : (
             <button
               onClick={injectErrors}
