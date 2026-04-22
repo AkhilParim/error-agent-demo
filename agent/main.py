@@ -14,8 +14,7 @@ from rich.panel import Panel
 from rich.text import Text
 
 from posthog_client import get_recent_exceptions, capture_agent_status
-from fixer import fix_errors_with_claude
-from github_client import commit_fixes, get_chaos_state
+from github_client import get_chaos_state
 
 load_dotenv(dotenv_path=Path(__file__).parent / ".env", override=True)
 
@@ -23,7 +22,6 @@ console = Console()
 
 POLL_INTERVAL_SECONDS = 12
 LOOKBACK_MINUTES = 5
-MIN_CHAOS_AGE_SECONDS = 180  # don't auto-fix until errors have been live for 3 min
 
 
 def log(level: str, message: str, **kwargs):
@@ -43,18 +41,14 @@ def main():
         padding=(0, 2),
     ))
 
-    required = ["ANTHROPIC_API_KEY", "POSTHOG_PERSONAL_API_KEY", "POSTHOG_PROJECT_ID"]
+    required = ["POSTHOG_PERSONAL_API_KEY", "POSTHOG_PROJECT_ID"]
     missing = [k for k in required if not os.getenv(k)]
     if missing:
         console.print(f"[red]Missing environment variables: {', '.join(missing)}[/red]")
         sys.exit(1)
 
     log("info", f"Polling every {POLL_INTERVAL_SECONDS}s · Looking back {LOOKBACK_MINUTES}m")
-    log("info", "GitHub token: " + ("✓ configured" if os.getenv("GITHUB_TOKEN") else "✗ missing — cannot auto-deploy"))
     console.print()
-
-    last_fix_timestamp: datetime | None = None
-    fixes_deployed = 0
 
     while True:
         try:
@@ -67,90 +61,24 @@ def main():
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
 
-            # Check GitHub to confirm errors are still active before invoking Claude.
-            # This prevents re-fixing after the UI button or a prior agent run already fixed it.
             chaos = get_chaos_state()
             if not chaos.get("active", False):
-                log("info", "Chaos state is inactive — exceptions are stale, skipping fix")
+                log("info", "Chaos state is inactive — exceptions are stale, skipping")
                 capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
 
-            # Enforce a minimum age before auto-fixing so the user has time to
-            # trigger the fix manually via the UI first.
-            chaos_ts = chaos.get("timestamp")
-            if chaos_ts:
-                try:
-                    injected_at = datetime.fromisoformat(chaos_ts.replace("Z", "+00:00"))
-                    age_seconds = (datetime.now(timezone.utc) - injected_at).total_seconds()
-                    if age_seconds < MIN_CHAOS_AGE_SECONDS:
-                        remaining = int(MIN_CHAOS_AGE_SECONDS - age_seconds)
-                        log("info", f"Chaos injected {int(age_seconds)}s ago — waiting {remaining}s before auto-fix")
-                        capture_agent_status("monitoring", f"Errors detected — auto-fix in {remaining}s if not manually fixed")
-                        time.sleep(POLL_INTERVAL_SECONDS)
-                        continue
-                except Exception:
-                    pass
+            log("warning", f"[bold]{len(exceptions)} exception(s) detected[/bold]")
+            for exc in exceptions[:3]:
+                console.print(f"  [red]→[/red] {exc['error_type']}: {exc['message'][:80]}")
+                if exc.get('component'):
+                    console.print(f"     [dim]component:[/dim] {exc['component']} · scene {exc.get('scene', '?')}")
 
-            if True:
-                log("warning", f"[bold]{len(exceptions)} exception(s) detected[/bold]")
-
-                for exc in exceptions[:3]:
-                    console.print(f"  [red]→[/red] {exc['error_type']}: {exc['message'][:80]}")
-                    if exc.get('component'):
-                        console.print(f"     [dim]component:[/dim] {exc['component']} · scene {exc.get('scene', '?')}")
-
-                capture_agent_status(
-                    "detected",
-                    f"Detected {len(exceptions)} exception(s) — invoking Claude",
-                    scene=exceptions[0].get("scene"),
-                )
-
-                log("agent", "Sending to Claude Sonnet for analysis and fix...")
-                start_time = time.time()
-
-                fixes = fix_errors_with_claude(exceptions)
-
-                if not fixes:
-                    log("warning", "Claude returned no fixes — skipping deploy")
-                    time.sleep(POLL_INTERVAL_SECONDS)
-                    continue
-
-                log("agent", f"Claude generated {len(fixes)} fix(es):")
-                for fix in fixes:
-                    console.print(f"  [green]→[/green] {fix['path']}")
-
-                capture_agent_status(
-                    "fixing",
-                    f"Applying {len(fixes)} fix(es) with Claude Sonnet",
-                    files=[f["path"] for f in fixes],
-                )
-
-                log("info", "Committing and pushing via GitHub API...")
-                commit_fixes(fixes, scene=exceptions[0].get("scene", 0))
-
-                elapsed = round(time.time() - start_time)
-                fixes_deployed += 1
-                last_fix_timestamp = datetime.now(timezone.utc)
-
-                capture_agent_status(
-                    "deployed",
-                    f"Fix deployed — {len(fixes)} file(s) updated · Vercel redeploying",
-                    files=[f["path"] for f in fixes],
-                    duration=elapsed,
-                    scene=exceptions[0].get("scene"),
-                )
-
-                console.print()
-                log("success", f"[bold]Fix deployed in {elapsed}s[/bold] · Total fixes: {fixes_deployed}")
-                log("success", "Vercel is redeploying now (~30s)")
-                console.print()
-
-                # Back off after a successful fix — long enough for Vercel to redeploy
-                # and for PostHog to stop receiving the now-fixed errors.
-                log("info", "Backing off 180s to allow Vercel redeploy + PostHog drain...")
-                time.sleep(180)
-                continue
+            capture_agent_status(
+                "detected",
+                f"Detected {len(exceptions)} exception(s) — awaiting user-triggered fix",
+                scene=exceptions[0].get("scene"),
+            )
 
         except KeyboardInterrupt:
             console.print("\n[yellow]Agent stopped by user.[/yellow]")
