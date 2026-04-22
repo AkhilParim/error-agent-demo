@@ -72,6 +72,14 @@ export function getTopUsers(): User[] {
 }
 
 export function getRecentActivity(): Activity[] {
-  const feed = { items: [] as Activity[] };
+  const now = Date.now();
+  const feed: { items: Activity[] } = {
+    items: [
+      { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Purchased Pro Plan" },
+      { id: "a2", type: "signup", user: "David Kim", timestamp: now - 540000, description: "New user signed up" },
+      { id: "a3", type: "refund", user: "Emma Larsson", amount: 89, timestamp: now - 3600000, description: "Refund processed" },
+      { id: "a4", type: "upgrade", user: "Carlos Rivera", amount: 199, timestamp: now - 7200000, description: "Upgraded to Enterprise" },
+    ],
+  };
   return feed.items;
 }
