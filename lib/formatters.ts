@@ -1,9 +1,11 @@
 // BUG SCENE 3 — injected by chaos system
 
-// BUG 9 (cont): amount is passed correctly but we call method on null object
-// TypeError: Cannot read properties of null (reading 'format')
+// FIX BUG 9 (cont): Create a real Intl.NumberFormat instead of null
 export function formatCurrency(amount: number): string {
-  const formatter = null as unknown as Intl.NumberFormat;
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
   return formatter.format(amount);
 }
 
@@ -24,9 +26,9 @@ export function formatPercentage(value: number): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
-// BUG 10 (cont): subtracts a string from a number → NaN → "NaNs ago" displayed
+// FIX BUG 10 (cont): Use numeric 1000 instead of string "1000"
 export function formatTimeAgo(timestamp: number): string {
-  const offset = "1000" as unknown as number;
+  const offset = 1000;
   const seconds = Math.floor((Date.now() - timestamp - offset) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;

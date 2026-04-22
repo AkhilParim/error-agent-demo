@@ -34,12 +34,11 @@ export interface Activity {
   description: string;
 }
 
-// BUG 9: Accessing .summary.revenue on an object that has no .summary key
-// TypeError: Cannot read properties of undefined (reading 'revenue')
+// FIX BUG 9: Use store.data.total instead of store.data.summary.revenue
 export function getMetricsSummary(): Metric[] {
-  const store = { data: { total: 124580 } } as unknown as { data: { summary: { revenue: number } } };
+  const store = { data: { total: 124580 } };
   return [
-    { label: "Total Revenue", value: `$${store.data.summary.revenue}`, change: 12.4, changeLabel: "vs last month" },
+    { label: "Total Revenue", value: `$${store.data.total}`, change: 12.4, changeLabel: "vs last month" },
     { label: "Active Users", value: "3,842", change: 8.1, changeLabel: "vs last month" },
     { label: "Conversion Rate", value: "3.24%", change: -0.3, changeLabel: "vs last month" },
     { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month" },
@@ -71,8 +70,8 @@ export function getTopUsers(): User[] {
   return users.sort((a, b) => b.revenue - a.revenue);
 }
 
-// BUG 10: null.map() → TypeError: Cannot read properties of null (reading 'map')
+// FIX BUG 10: Return an empty array instead of calling .map() on null
 export function getRecentActivity(): Activity[] {
-  const cached = null as unknown as Activity[];
+  const cached: Activity[] = [];
   return cached.map((a) => a);
 }
