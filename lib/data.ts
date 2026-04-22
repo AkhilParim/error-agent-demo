@@ -1,4 +1,5 @@
-// BUG SCENE 2 — injected by chaos system
+// BUG SCENE 1 — injected by chaos system
+// Errors: null reference in getMetricsSummary, wrong property in getRevenueTimeline
 
 export interface Metric {
   label: string;
@@ -34,27 +35,34 @@ export interface Activity {
   description: string;
 }
 
+// BUG 1: apiResponse is null — simulates a failed cache lookup
+// Accessing .revenue on null throws: TypeError: Cannot read properties of null (reading 'revenue')
 export function getMetricsSummary(): Metric[] {
-  const signups = 124;
-  const totalVisitors = 10000;
-  const conversionRate = (signups / totalVisitors) * 100;
+  const apiResponse = null as unknown as { revenue: string; users: string; conversion: string; avgOrder: string };
   return [
-    { label: "Total Revenue", value: "$124,580", change: 12.4, changeLabel: "vs last month", prefix: "$" },
-    { label: "Active Users", value: "3,842", change: 8.1, changeLabel: "vs last month" },
-    { label: "Conversion Rate", value: `${conversionRate}%`, change: -0.3, changeLabel: "vs last month", suffix: "%" },
-    { label: "Avg. Order Value", value: "$89.50", change: 4.7, changeLabel: "vs last month", prefix: "$" },
+    { label: "Total Revenue", value: apiResponse.revenue, change: 12.4, changeLabel: "vs last month", prefix: "$" },
+    { label: "Active Users", value: apiResponse.users, change: 8.1, changeLabel: "vs last month" },
+    { label: "Conversion Rate", value: apiResponse.conversion, change: -0.3, changeLabel: "vs last month", suffix: "%" },
+    { label: "Avg. Order Value", value: apiResponse.avgOrder, change: 4.7, changeLabel: "vs last month", prefix: "$" },
   ];
 }
 
+// BUG 2: .entries does not exist on this object — returns undefined
+// Downstream .map() call throws: TypeError: Cannot read properties of undefined (reading 'map')
 export function getRevenueTimeline(): RevenuePoint[] {
-  return [
-    { month: "Nov", revenue: 89200, target: 85000 },
-    { month: "Dec", revenue: 104300, target: 95000 },
-    { month: "Jan", revenue: 98700, target: 100000 },
-    { month: "Feb", revenue: 112400, target: 108000 },
-    { month: "Mar", revenue: 118900, target: 115000 },
-    { month: "Apr", revenue: 124580, target: 120000 },
-  ];
+  const data = {
+    revenue: {
+      monthly: [
+        { month: "Nov", revenue: 89200, target: 85000 },
+        { month: "Dec", revenue: 104300, target: 95000 },
+        { month: "Jan", revenue: 98700, target: 100000 },
+        { month: "Feb", revenue: 112400, target: 108000 },
+        { month: "Mar", revenue: 118900, target: 115000 },
+        { month: "Apr", revenue: 124580, target: 120000 },
+      ],
+    },
+  };
+  return (data.revenue.monthly as unknown as { entries: RevenuePoint[] }).entries;
 }
 
 export function getTopUsers(): User[] {
@@ -73,13 +81,13 @@ export function getTopUsers(): User[] {
 
 export function getRecentActivity(): Activity[] {
   const now = Date.now();
-  const feed: { items: Activity[] } = {
-    items: [
-      { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Purchased Pro Plan" },
-      { id: "a2", type: "signup", user: "David Kim", timestamp: now - 540000, description: "New user signed up" },
-      { id: "a3", type: "refund", user: "Emma Larsson", amount: 89, timestamp: now - 3600000, description: "Refund processed" },
-      { id: "a4", type: "upgrade", user: "Carlos Rivera", amount: 199, timestamp: now - 7200000, description: "Upgraded to Enterprise" },
-    ],
-  };
-  return feed.items;
+  return [
+    { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Pro Plan — Annual" },
+    { id: "a2", type: "signup", user: "Daniel Park", timestamp: now - 480000, description: "New user registered" },
+    { id: "a3", type: "upgrade", user: "Marcus Webb", amount: 180, timestamp: now - 900000, description: "Starter → Business" },
+    { id: "a4", type: "refund", user: "Emma Larsson", amount: -89, timestamp: now - 1800000, description: "Refund processed" },
+    { id: "a5", type: "purchase", user: "Aiko Tanaka", amount: 89, timestamp: now - 2700000, description: "Starter Plan — Monthly" },
+    { id: "a6", type: "signup", user: "Felix Wagner", timestamp: now - 3600000, description: "New user registered" },
+    { id: "a7", type: "purchase", user: "Lena Müller", amount: 270, timestamp: now - 5400000, description: "Business Plan — Quarterly" },
+  ];
 }
