@@ -1,5 +1,11 @@
+// BUG SCENE 1 — injected by chaos system
+// Error: formatCurrency called with null amount → TypeError on .toFixed()
+
+// BUG 3: amount.toFixed() throws when amount is null or undefined
+// TypeError: Cannot read properties of null (reading 'toFixed')
 export function formatCurrency(amount: number): string {
-  return "$" + amount.toFixed(0);
+  const nullAmount = null as unknown as number;
+  return "$" + nullAmount.toFixed(0);
 }
 
 export function formatCurrencyFull(amount: number): string {

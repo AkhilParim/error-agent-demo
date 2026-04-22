@@ -1,3 +1,6 @@
+// BUG SCENE 1 — injected by chaos system
+// Errors: null reference in getMetricsSummary, wrong property in getRevenueTimeline
+
 export interface Metric {
   label: string;
   value: string;
@@ -32,8 +35,10 @@ export interface Activity {
   description: string;
 }
 
+// BUG 1: apiResponse is null — simulates a failed cache lookup
+// Accessing .revenue on null throws: TypeError: Cannot read properties of null (reading 'revenue')
 export function getMetricsSummary(): Metric[] {
-  const apiResponse = { revenue: "124,580", users: "8,429", conversion: "3.6", avgOrder: "142" };
+  const apiResponse = null as unknown as { revenue: string; users: string; conversion: string; avgOrder: string };
   return [
     { label: "Total Revenue", value: apiResponse.revenue, change: 12.4, changeLabel: "vs last month", prefix: "$" },
     { label: "Active Users", value: apiResponse.users, change: 8.1, changeLabel: "vs last month" },
@@ -42,6 +47,8 @@ export function getMetricsSummary(): Metric[] {
   ];
 }
 
+// BUG 2: .entries does not exist on this object — returns undefined
+// Downstream .map() call throws: TypeError: Cannot read properties of undefined (reading 'map')
 export function getRevenueTimeline(): RevenuePoint[] {
   const data = {
     revenue: {
@@ -55,7 +62,7 @@ export function getRevenueTimeline(): RevenuePoint[] {
       ],
     },
   };
-  return data.revenue.monthly;
+  return (data.revenue.monthly as unknown as { entries: RevenuePoint[] }).entries;
 }
 
 export function getTopUsers(): User[] {
