@@ -1,10 +1,14 @@
-export function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null) return "$0";
-  return "$" + amount.toFixed(0);
+// BUG SCENE 1 — injected by chaos system
+// Error: formatCurrency called with null amount → TypeError on .toFixed()
+
+// BUG 3: amount.toFixed() throws when amount is null or undefined
+// TypeError: Cannot read properties of null (reading 'toFixed')
+export function formatCurrency(amount: number): string {
+  const nullAmount = null as unknown as number;
+  return "$" + nullAmount.toFixed(0);
 }
 
-export function formatCurrencyFull(amount: number | null | undefined): string {
-  if (amount == null) return "$0.00";
+export function formatCurrencyFull(amount: number): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -13,13 +17,11 @@ export function formatCurrencyFull(amount: number | null | undefined): string {
   }).format(amount);
 }
 
-export function formatNumber(value: number | null | undefined): string {
-  if (value == null) return "0";
+export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatPercentage(value: number | null | undefined): string {
-  if (value == null) return "0.0%";
+export function formatPercentage(value: number): string {
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
@@ -39,7 +41,6 @@ export function formatDate(isoString: string): string {
   });
 }
 
-export function formatUserName(name: string | null | undefined): string {
-  if (name == null) return "";
+export function formatUserName(name: string): string {
   return name.trim();
 }

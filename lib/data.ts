@@ -1,3 +1,6 @@
+// BUG SCENE 1 — injected by chaos system
+// Errors: null reference in getMetricsSummary, wrong property in getRevenueTimeline
+
 export interface Metric {
   label: string;
   value: string;
@@ -32,8 +35,10 @@ export interface Activity {
   description: string;
 }
 
+// BUG 1: apiResponse is null — simulates a failed cache lookup
+// Accessing .revenue on null throws: TypeError: Cannot read properties of null (reading 'revenue')
 export function getMetricsSummary(): Metric[] {
-  const apiResponse = { revenue: "124,580", users: "3,842", conversion: "3.6", avgOrder: "142" };
+  const apiResponse = null as unknown as { revenue: string; users: string; conversion: string; avgOrder: string };
   return [
     { label: "Total Revenue", value: apiResponse.revenue, change: 12.4, changeLabel: "vs last month", prefix: "$" },
     { label: "Active Users", value: apiResponse.users, change: 8.1, changeLabel: "vs last month" },
@@ -42,6 +47,8 @@ export function getMetricsSummary(): Metric[] {
   ];
 }
 
+// BUG 2: .entries does not exist on this object — returns undefined
+// Downstream .map() call throws: TypeError: Cannot read properties of undefined (reading 'map')
 export function getRevenueTimeline(): RevenuePoint[] {
   const data = {
     revenue: {
@@ -55,7 +62,7 @@ export function getRevenueTimeline(): RevenuePoint[] {
       ],
     },
   };
-  return data.revenue.monthly;
+  return (data.revenue.monthly as unknown as { entries: RevenuePoint[] }).entries;
 }
 
 export function getTopUsers(): User[] {
@@ -69,16 +76,12 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
-  return users.sort((a, b) => {
-    const aRevenue = a?.revenue ?? 0;
-    const bRevenue = b?.revenue ?? 0;
-    return bRevenue - aRevenue;
-  });
+  return users.sort((a, b) => b.revenue - a.revenue);
 }
 
 export function getRecentActivity(): Activity[] {
   const now = Date.now();
-  const activities: Activity[] = [
+  return [
     { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Pro Plan — Annual" },
     { id: "a2", type: "signup", user: "Daniel Park", timestamp: now - 480000, description: "New user registered" },
     { id: "a3", type: "upgrade", user: "Marcus Webb", amount: 180, timestamp: now - 900000, description: "Starter → Business" },
@@ -87,5 +90,4 @@ export function getRecentActivity(): Activity[] {
     { id: "a6", type: "signup", user: "Felix Wagner", timestamp: now - 3600000, description: "New user registered" },
     { id: "a7", type: "purchase", user: "Lena Müller", amount: 270, timestamp: now - 5400000, description: "Business Plan — Quarterly" },
   ];
-  return activities.filter((a) => a != null);
 }
