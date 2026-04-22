@@ -69,12 +69,16 @@ export function getTopUsers(): User[] {
     { id: "u7", name: "Carlos Rivera", email: "c.rivera@co.mx", revenue: 8920, orders: 19, status: "active", joinedAt: "2023-09-18" },
     { id: "u8", name: "Emma Larsson", email: "e.larsson@ab.se", revenue: 7640, orders: 16, status: "churned", joinedAt: "2022-08-25" },
   ];
-  return users.sort((a, b) => b.revenue - a.revenue);
+  return users.sort((a, b) => {
+    const aRevenue = a?.revenue ?? 0;
+    const bRevenue = b?.revenue ?? 0;
+    return bRevenue - aRevenue;
+  });
 }
 
 export function getRecentActivity(): Activity[] {
   const now = Date.now();
-  return [
+  const activities: Activity[] = [
     { id: "a1", type: "purchase", user: "Sophia Chen", amount: 340, timestamp: now - 120000, description: "Pro Plan — Annual" },
     { id: "a2", type: "signup", user: "Daniel Park", timestamp: now - 480000, description: "New user registered" },
     { id: "a3", type: "upgrade", user: "Marcus Webb", amount: 180, timestamp: now - 900000, description: "Starter → Business" },
@@ -83,4 +87,5 @@ export function getRecentActivity(): Activity[] {
     { id: "a6", type: "signup", user: "Felix Wagner", timestamp: now - 3600000, description: "New user registered" },
     { id: "a7", type: "purchase", user: "Lena Müller", amount: 270, timestamp: now - 5400000, description: "Business Plan — Quarterly" },
   ];
+  return activities.filter((a) => a != null);
 }

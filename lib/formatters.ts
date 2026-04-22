@@ -1,8 +1,10 @@
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | null | undefined): string {
+  if (amount == null) return "$0";
   return "$" + amount.toFixed(0);
 }
 
-export function formatCurrencyFull(amount: number): string {
+export function formatCurrencyFull(amount: number | null | undefined): string {
+  if (amount == null) return "$0.00";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -11,11 +13,13 @@ export function formatCurrencyFull(amount: number): string {
   }).format(amount);
 }
 
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | null | undefined): string {
+  if (value == null) return "0";
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatPercentage(value: number): string {
+export function formatPercentage(value: number | null | undefined): string {
+  if (value == null) return "0.0%";
   return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
@@ -35,6 +39,7 @@ export function formatDate(isoString: string): string {
   });
 }
 
-export function formatUserName(name: string): string {
+export function formatUserName(name: string | null | undefined): string {
+  if (name == null) return "";
   return name.trim();
 }
