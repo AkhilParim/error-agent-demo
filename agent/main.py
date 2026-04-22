@@ -23,6 +23,7 @@ console = Console()
 
 POLL_INTERVAL_SECONDS = 12
 LOOKBACK_MINUTES = 5
+MIN_CHAOS_AGE_SECONDS = 180  # don't auto-fix until errors have been live for 3 min
 
 
 def log(level: str, message: str, **kwargs):
@@ -74,6 +75,22 @@ def main():
                 capture_agent_status("monitoring", "Polling PostHog — no exceptions found")
                 time.sleep(POLL_INTERVAL_SECONDS)
                 continue
+
+            # Enforce a minimum age before auto-fixing so the user has time to
+            # trigger the fix manually via the UI first.
+            chaos_ts = chaos.get("timestamp")
+            if chaos_ts:
+                try:
+                    injected_at = datetime.fromisoformat(chaos_ts.replace("Z", "+00:00"))
+                    age_seconds = (datetime.now(timezone.utc) - injected_at).total_seconds()
+                    if age_seconds < MIN_CHAOS_AGE_SECONDS:
+                        remaining = int(MIN_CHAOS_AGE_SECONDS - age_seconds)
+                        log("info", f"Chaos injected {int(age_seconds)}s ago — waiting {remaining}s before auto-fix")
+                        capture_agent_status("monitoring", f"Errors detected — auto-fix in {remaining}s if not manually fixed")
+                        time.sleep(POLL_INTERVAL_SECONDS)
+                        continue
+                except Exception:
+                    pass
 
             if True:
                 log("warning", f"[bold]{len(exceptions)} exception(s) detected[/bold]")
